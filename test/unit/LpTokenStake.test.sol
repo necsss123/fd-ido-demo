@@ -103,7 +103,7 @@ contract LpTokenStakeTest is Test {
     }
 
     /*/////////////////////////////////////////////////////////////
-                           USER DEPOSIT LPTOKEN
+                        USER DEPOSIT/WITHDRAW LPTOKEN
     /////////////////////////////////////////////////////////////*/
     modifier createPool() {
         vm.prank(user_Alice);
@@ -169,6 +169,9 @@ contract LpTokenStakeTest is Test {
         assertEq(expectedDepositedAmount, eth_lp.totalDepositAmount);
     }
 
+    /*/////////////////////////////////////////////////////////////
+                        UPDATE POOL
+    /////////////////////////////////////////////////////////////*/
     function testFuzzunitCumulativeRewardsAndLastUpdateTimeShouldBeUpdateCorrectly()
         public
         createPool
@@ -197,6 +200,9 @@ contract LpTokenStakeTest is Test {
         assertEq(block.timestamp, eth_lp.lastUpdateTime);
     }
 
+    /*/////////////////////////////////////////////////////////////
+                        Rewards Calculate
+    /////////////////////////////////////////////////////////////*/
     function testFuzzRewardsShouldBeCalculateCorrectly() public createPool {
         LpTokenStakeV1.PoolInfo memory eth_lp = stake.getPoolInfo(
             address(eth_minecraft_lp)
@@ -329,6 +335,9 @@ contract LpTokenStakeTest is Test {
         assertEq(4 * 10 ** 18, lastRewardsToBeClaimed);
     }
 
+    /*/////////////////////////////////////////////////////////////
+                        STATUS CHANGE
+    /////////////////////////////////////////////////////////////*/
     function testCanChangePoolStatusSuccessfully() public createPool {
         stake.setPoolStatus(address(eth_minecraft_lp), true);
         stake.setPoolRewardPerSec(address(eth_minecraft_lp), 2 * 10 ** 18);
@@ -337,5 +346,33 @@ contract LpTokenStakeTest is Test {
         );
         assertEq(true, eth_lp.isLocked);
         assertEq(2 * 10 ** 18, eth_lp.rewardPerSec);
+    }
+
+    function testRewardPerSecChangeRewardsStillCalculateCorrectly()
+        public
+        createPool
+    {
+        LpTokenStakeV1.PoolInfo memory eth_lp = stake.getPoolInfo(
+            address(eth_minecraft_lp)
+        );
+
+        vm.warp(eth_lp.lastUpdateTime + 10 seconds);
+        uint256 currentBlockNum = block.number + 1;
+        vm.roll(currentBlockNum);
+
+        (uint256 lastRewards, ) = stake.getUserRewardsToBeClaimed(
+            address(eth_minecraft_lp),
+            user_Alice
+        );
+        assertEq(2.5 * 10 ** 18, lastRewards);
+        stake.setPoolRewardPerSec(address(eth_minecraft_lp), 2 * 10 ** 18);
+        vm.warp(eth_lp.lastUpdateTime + 12 seconds);
+        vm.roll(currentBlockNum + 1);
+
+        (uint256 lastRewards1, ) = stake.getUserRewardsToBeClaimed(
+            address(eth_minecraft_lp),
+            user_Alice
+        );
+        assertEq(3.5 * 10 ** 18, lastRewards1);
     }
 }

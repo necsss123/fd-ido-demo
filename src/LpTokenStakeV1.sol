@@ -216,6 +216,12 @@ contract LpTokenStakeV1 is
         require(poolInfo.stakeLpToken != address(0), "The pool doesn't exist");
         require(_newValue >= 0, "Invalid value");
         require(poolInfo.rewardPerSec != _newValue, "Repeat setting");
+        (
+            uint256 newLastUpdateTime,
+            uint256 newUnitCumulativeRewards
+        ) = _updatePoolInfo(poolInfo);
+        poolInfo.unitCumulativeRewards = newUnitCumulativeRewards;
+        poolInfo.lastUpdateTime = newLastUpdateTime;
         poolInfo.rewardPerSec = _newValue;
 
         assembly {
