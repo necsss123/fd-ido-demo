@@ -1,0 +1,3 @@
+AirdropTest:testUserCannotClaimItRepeatedly() (gas: 85652)
+AirdropTest:testUserOrGasPayerCanClaimSuccessful() (gas: 102389)
+MinecraftTest:testInitialIsSuccess() (gas: 57901)
