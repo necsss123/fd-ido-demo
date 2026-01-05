@@ -3,7 +3,7 @@ src = "src"
 out = "out"
 libs = ["lib"]
 fs_permissions = [{ access = "read-write", path = "./"}]
-remappings = ["@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts"]
+remappings = ["@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts", "@v4-periphery/src=lib/v4-periphery/src", "@v4-periphery/permit2=lib/v4-periphery/lib/permit2","@v4-core/src/=lib/v4-periphery/lib/v4-core/src"]
 
 [invariant]
 runs = 128 
