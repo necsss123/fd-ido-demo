@@ -10,8 +10,8 @@ import {LiquidityAmounts} from "@v4-periphery/src/libraries/LiquidityAmounts.sol
 import {Actions} from "@v4-periphery/src/libraries/Actions.sol";
 import {IStateView} from "@v4-periphery/src/interfaces/IStateView.sol";
 import {TickMath} from "@v4-core/src/libraries/TickMath.sol";
-// import {IPermit2} from "@v4-periphery/permit2/src/interfaces/IPermit2.sol";
-import "@v4-periphery/src/interfaces/IPermit2Forwarder.sol";
+import "@v4-periphery/permit2/src/interfaces/IPermit2.sol";
+import {PermitHash} from "@v4-periphery/permit2/src/libraries/PermitHash.sol";
 import "./Constants.sol";
 
 contract LiquidityOperationWithV4 {
@@ -28,8 +28,8 @@ contract LiquidityOperationWithV4 {
 
     mapping(uint256 tokenId => Currency currency) public queryPool;
 
-    struct Permit2Data {
-        IAllowanceTransfer.PermitBatch permit;
+    struct AuthData {
+        ISignatureTransfer.PermitBatchTransferFrom permit;
         bytes signature;
     }
 
@@ -44,14 +44,14 @@ contract LiquidityOperationWithV4 {
         i_minecraft = Currency.wrap(_minecraft);
         i_stateView = IStateView(_stateView);
 
-        // IERC20Minimal(_minecraft).approve(PERMIT2, type(uint256).max);
+        IERC20Minimal(_minecraft).approve(PERMIT2, type(uint256).max);
 
-        // IPermit2(PERMIT2).approve(
-        //     _minecraft,
-        //     address(i_positionManager),
-        //     type(uint160).max,
-        //     type(uint48).max
-        // );
+        IPermit2(PERMIT2).approve(
+            _minecraft,
+            address(i_positionManager),
+            type(uint160).max,
+            type(uint48).max
+        );
     }
 
     function increaseLiquidity(
@@ -61,13 +61,31 @@ contract LiquidityOperationWithV4 {
         int24 _lowerTick,
         int24 _upperTick,
         uint24 _fee,
-        Permit2Data calldata batchPermitCurrency
+        AuthData calldata _authData
     ) external payable returns (uint256) {
-        IPermit2Forwarder(PERMIT2).permitBatch(
-            msg.sender,
-            batchPermitCurrency.permit,
-            batchPermitCurrency.signature
-        );
+        ISignatureTransfer.SignatureTransferDetails
+            memory token0detail = ISignatureTransfer.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: _minecraftAmount
+            });
+
+        ISignatureTransfer.SignatureTransferDetails
+            memory token1detail = ISignatureTransfer.SignatureTransferDetails({
+                to: address(this),
+                requestedAmount: _currencyAmount
+            });
+
+        ISignatureTransfer.SignatureTransferDetails[] memory tokendetailsArr;
+        tokendetailsArr = new ISignatureTransfer.SignatureTransferDetails[](2);
+        tokendetailsArr[0] = token0detail;
+        tokendetailsArr[1] = token1detail;
+
+        IPermit2(PERMIT2).permitTransferFrom({
+            permit: _authData.permit,
+            transferDetails: tokendetailsArr,
+            owner: msg.sender,
+            signature: _authData.signature
+        });
 
         int24 actualLowerTick = (_lowerTick / TICK_SPACING) * TICK_SPACING;
         int24 actualUpperTick = (_upperTick / TICK_SPACING) * TICK_SPACING;
@@ -102,17 +120,17 @@ contract LiquidityOperationWithV4 {
         ];
 
         if (tokenId == 0) {
-            // IERC20Minimal(Currency.unwrap(_currency)).approve(
-            //     PERMIT2,
-            //     type(uint256).max
-            // );
+            IERC20Minimal(Currency.unwrap(_currency)).approve(
+                PERMIT2,
+                type(uint256).max
+            );
 
-            // IPermit2(PERMIT2).approve(
-            //     Currency.unwrap(_currency),
-            //     address(i_positionManager),
-            //     type(uint160).max,
-            //     type(uint48).max
-            // );
+            IPermit2(PERMIT2).approve(
+                Currency.unwrap(_currency),
+                address(i_positionManager),
+                type(uint160).max,
+                type(uint48).max
+            );
 
             // IPermit2(PERMIT2).transferFrom(
             //     msg.sender,

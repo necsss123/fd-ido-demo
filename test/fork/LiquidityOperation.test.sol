@@ -8,8 +8,8 @@ import {IPositionManager} from "@v4-periphery/src/interfaces/IPositionManager.so
 import {POSITION_MANAGER, POOL_MANAGER, USDC, WBTC, STATE_VIEW, PERMIT2} from "../../src/Constants.sol";
 import {LiquidityOperationWithV4} from "../../src/LiquidityOperationWithV4.sol";
 import "@v4-core/src/types/PoolKey.sol";
-import {IPermit2} from "@v4-periphery/permit2/src/interfaces/IPermit2.sol";
-import "@v4-periphery/src/interfaces/IPermit2Forwarder.sol";
+import "@v4-periphery/permit2/src/interfaces/IPermit2.sol";
+// import "@v4-periphery/src/interfaces/IPermit2Forwarder.sol";
 import {PermitHash} from "@v4-periphery/permit2/src/libraries/PermitHash.sol";
 
 contract LiquidityOperationTest is Test, TestUtil {
@@ -45,6 +45,9 @@ contract LiquidityOperationTest is Test, TestUtil {
         deal(WBTC, user, 10 * 1e8);
         deal(user, 100 * 1e18);
 
+        // deal(USDC, address(lpOperation), 1e6 * 1e6);
+        // deal(WBTC, address(lpOperation), 10 * 1e8);
+
         vm.startPrank(user);
 
         usdc.approve(PERMIT2, type(uint256).max);
@@ -52,14 +55,14 @@ contract LiquidityOperationTest is Test, TestUtil {
 
         IPermit2(PERMIT2).approve(
             USDC,
-            address(posm),
+            address(lpOperation),
             type(uint160).max,
             type(uint48).max
         );
 
         IPermit2(PERMIT2).approve(
             WBTC,
-            address(posm),
+            address(lpOperation),
             type(uint160).max,
             type(uint48).max
         );
@@ -87,32 +90,28 @@ contract LiquidityOperationTest is Test, TestUtil {
         testAssister.set("WBTC before", wbtc.balanceOf(user));
         testAssister.set("USDC before", usdc.balanceOf(user));
 
-        IAllowanceTransfer.PermitDetails
-            memory usdcPermitDetail = IAllowanceTransfer.PermitDetails({
-                token: USDC,
-                amount: 100000 * 1e6,
-                expiration: uint48(block.timestamp),
-                nonce: 0
-            });
-
-        IAllowanceTransfer.PermitDetails
-            memory wbtcPermitDetail = IAllowanceTransfer.PermitDetails({
+        ISignatureTransfer.TokenPermissions
+            memory token0Perm = ISignatureTransfer.TokenPermissions({
                 token: WBTC,
-                amount: 1 * 1e8,
-                expiration: uint48(block.timestamp),
-                nonce: 0
+                amount: 1 * 1e8
             });
 
-        IAllowanceTransfer.PermitDetails[] memory permitDetails;
-        permitDetails = new IAllowanceTransfer.PermitDetails[](2);
-        permitDetails[0] = usdcPermitDetail;
-        permitDetails[1] = wbtcPermitDetail;
+        ISignatureTransfer.TokenPermissions
+            memory token1Perm = ISignatureTransfer.TokenPermissions({
+                token: USDC,
+                amount: 100000 * 1e6
+            });
 
-        IAllowanceTransfer.PermitBatch memory permitBatch = IAllowanceTransfer
-            .PermitBatch({
-                details: permitDetails,
-                spender: address(posm), //  address(posm)
-                sigDeadline: block.timestamp
+        ISignatureTransfer.TokenPermissions[] memory tokenPermArr;
+        tokenPermArr = new ISignatureTransfer.TokenPermissions[](2);
+        tokenPermArr[0] = token0Perm;
+        tokenPermArr[1] = token1Perm;
+
+        ISignatureTransfer.PermitBatchTransferFrom
+            memory permitBatch = ISignatureTransfer.PermitBatchTransferFrom({
+                permitted: tokenPermArr,
+                nonce: 1,
+                deadline: block.timestamp
             });
 
         bytes32 structHash = PermitHash.hash(permitBatch);
@@ -129,8 +128,8 @@ contract LiquidityOperationTest is Test, TestUtil {
 
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        LiquidityOperationWithV4.Permit2Data
-            memory permitData = LiquidityOperationWithV4.Permit2Data({
+        LiquidityOperationWithV4.AuthData
+            memory permitData = LiquidityOperationWithV4.AuthData({
                 permit: permitBatch,
                 signature: signature
             });
